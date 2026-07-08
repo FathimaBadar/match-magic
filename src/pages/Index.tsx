@@ -12,8 +12,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { ReconciliationEngine } from '@/utils/reconciliationEngine';
 import { StreamingReconciliationEngine } from '@/utils/streamingReconciliationEngine';
 import * as XLSX from 'xlsx';
+import { useAuth } from '@/contexts/AuthContext';
+import { saveReconciliationHistory } from '@/utils/historyService';
+import { toast } from '@/hooks/use-toast';
 
 const Index = () => {
+  const { user } = useAuth();
   const [currentStep, setCurrentStep] = useState<'upload' | 'mapping' | 'sort-config' | 'results'>('upload');
   const [sourceFile, setSourceFile] = useState<File | null>(null);
   const [targetFile, setTargetFile] = useState<File | null>(null);
@@ -159,6 +163,37 @@ const Index = () => {
       console.log('Reconciliation results:', results);
       setReconciliationResults(results);
       setCurrentStep('results');
+
+      if (user) {
+        saveReconciliationHistory({
+          userId: user.id,
+          sourceFile,
+          targetFile,
+          sourceFileName: sourceFile?.name || 'Source File',
+          targetFileName: targetFile?.name || 'Target File',
+          results,
+          config: {
+            mappings,
+            sourceVirtualFields,
+            targetVirtualFields,
+            transformations,
+            sortConfiguration,
+          },
+        }).then(({ error }) => {
+          if (error) {
+            toast({
+              title: 'History not saved',
+              description: error,
+              variant: 'destructive',
+            });
+          } else {
+            toast({
+              title: 'Saved to history',
+              description: 'This reconciliation run has been saved to your history.',
+            });
+          }
+        });
+      }
     } catch (error) {
       console.error('Reconciliation failed:', error);
     } finally {
